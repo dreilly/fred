@@ -1,24 +1,23 @@
 use core::panic;
 use crossterm::{
     cursor,
-    event::{self, read, Event, KeyCode, KeyEvent, KeyModifiers},
-    execute, queue,
+    event::{read, Event, KeyCode, KeyEvent, KeyModifiers},
     style::Print,
-    terminal::{self, ClearType, LeaveAlternateScreen},
-    ExecutableCommand, QueueableCommand, Result,
+    terminal::{self, ClearType},
+    QueueableCommand, Result,
 };
 use std::fs::File;
 use std::io::{self, stdout, BufRead, Write};
 use std::path::Path;
 
-enum Editor_Mode {
+enum EditorMode {
     Normal,
     Insert,
     Visual,
 }
 struct Editor {
     lines: Vec<Line>,
-    mode: Editor_Mode,
+    mode: EditorMode,
 }
 
 struct Line {
@@ -28,7 +27,8 @@ struct Line {
 impl Editor {
     fn draw_editor(&self) -> Result<()> {
         let mut stdout = stdout();
-        for (pos, l) in self.lines.iter().enumerate() {
+        // NOTE: _ is position, can be used for line numbers
+        for (_, l) in self.lines.iter().enumerate() {
             stdout.queue(cursor::MoveToColumn(0))?;
             for lc in &l.line_chars {
                 match lc {
@@ -44,7 +44,7 @@ impl Editor {
     }
 }
 
-fn init_editor() -> Result<(Editor)> {
+fn init_editor() -> Result<Editor> {
     let mut stdout = stdout();
     stdout.queue(terminal::EnterAlternateScreen)?;
     stdout.queue(terminal::Clear(ClearType::All))?;
@@ -52,7 +52,7 @@ fn init_editor() -> Result<(Editor)> {
     terminal::enable_raw_mode()?;
     let editor = Editor {
         lines: Vec::new(),
-        mode: Editor_Mode::Normal,
+        mode: EditorMode::Normal,
     };
     Ok(editor)
 }
@@ -78,18 +78,9 @@ where
 }
 
 fn main() -> Result<()> {
-    // let args: Vec<String> = std::env::args().collect();
-    // println!("{:?}", args);
-    // if args.len() > 1 && args[1].len() > 0 {
-    //     //arg[1] should be a file name,
-    //     //read file stuff from here i guess
-    //     println!("{}", args[1]);
-    // }
-
     let mut editor = init_editor()?;
 
     if let Ok(lines) = read_lines("src/main.rs") {
-        let mut lines_buff: Vec<Line> = Vec::new();
         for row in lines {
             let mut line: Line = Line {
                 line_chars: Vec::new(),
@@ -117,7 +108,7 @@ fn main() -> Result<()> {
                 }
                 _ => {}
             },
-            Event::Key(KeyEvent { code, modifiers }) => {
+            Event::Key(KeyEvent { code, modifiers: _ }) => {
                 match code {
                     KeyCode::Char(c) => match c {
                         'h' => {
