@@ -30,9 +30,12 @@ struct Line {
 impl Editor {
     fn draw_editor(&self, redraw: bool) -> Result<()> {
         let mut stdout = stdout();
-        // NOTE: _ is position, can be used for line numbers
         let region = self.draw_region;
-        let iter = self.lines[region.0..region.1].iter().enumerate();
+        let mut region_end = region.1;
+        if region_end > self.lines.len() {
+            region_end = self.lines.len();
+        }
+        let iter = self.lines[region.0..region_end].iter().enumerate();
         for (pos, l) in iter {
             if pos >= region.1 - 1 {
                 break;
@@ -80,18 +83,34 @@ impl Editor {
         self.status = self.get_status_message();
     }
 
+    fn update_draw_region(&mut self, start: usize, end: usize) {
+        self.draw_region = (start, end)
+    }
+
     fn get_status_message(&self) -> String {
+        let ln_addend = if self.draw_region.0 > 0 {
+            self.draw_region.0 + 1
+        } else {
+            self.draw_region.0
+        };
+        let ln = self.draw_line + ln_addend;
         match self.mode {
             EditorMode::Normal => {
-                format!("NORMAL | {}", self.draw_line)
+                format!(
+                    "NORMAL | Line: {}/{} | DrawRegion: {:?} | DrawLine: {} | TermSize: {:?}",
+                    ln,
+                    self.lines.len(),
+                    self.draw_region,
+                    self.draw_line,
+                    get_term_size(),
+                )
             }
             EditorMode::Insert => {
-                format!("INSERT | {}", self.draw_line)
+                format!("INSERT | {}", ln)
             }
             EditorMode::Visual => {
-                format!("VISUAL | {}", self.draw_line)
+                format!("VISUAL | {}", ln)
             }
-            _ => String::from("STATUS ERROR"),
         }
     }
 }
@@ -127,7 +146,7 @@ where
 {
     let file = File::open(filename);
     match file {
-        Err(e) => panic!("{}", e), //println!("{:?}", e),
+        Err(e) => panic!("{}", e),
         Ok(f) => Ok(io::BufReader::new(f).lines()),
     }
 }
@@ -195,25 +214,49 @@ fn main() -> Result<()> {
                             stdout.flush()?;
                         }
                         'j' => {
-                            let mut pos = cursor::position().unwrap().1 + 1;
-                            let term_size = get_term_size().1 as u16;
-                            if pos < term_size - 1 {
-                                let mut stdout = stdout();
-                                stdout.queue(cursor::MoveDown(1))?;
-                                stdout.flush()?;
-                                pos += 1;
+                            if editor.draw_region.1 < editor.lines.len()
+                                || editor.draw_line < get_term_size().1 - 1
+                            {
+                                let mut pos = cursor::position().unwrap().1 + 1;
+                                let term_size = get_term_size().1 as u16;
+                                if pos < term_size - 1 {
+                                    let mut stdout = stdout();
+                                    stdout.queue(cursor::MoveDown(1))?;
+                                    stdout.flush()?;
+                                    pos += 1;
+                                } else {
+                                    let region = editor.draw_region;
+                                    editor.update_draw_region(region.0 + 1, region.1 + 1);
+                                }
+                                editor.set_draw_line(pos as usize);
+                                editor.update_status();
+                                save_cursor_pos();
+                                editor.redraw()?;
+                                restore_cursor_pos();
                             }
-                            editor.set_draw_line(pos as usize);
-                            editor.update_status();
-                            save_cursor_pos();
-                            editor.redraw()?;
-                            restore_cursor_pos();
                         }
                         'k' => {
-                            let mut stdout = stdout();
-                            stdout.queue(cursor::MoveUp(1))?;
-                            stdout.flush()?;
-                            terminal::ScrollUp(1);
+                            if editor.draw_region.0 > 0 || editor.draw_line > 1 {
+                                let mut pos = cursor::position().unwrap().1 + 1;
+                                if pos > 1 {
+                                    let mut stdout = stdout();
+                                    stdout.queue(cursor::MoveUp(1))?;
+                                    stdout.flush()?;
+                                    pos -= 1;
+                                } else {
+                                    let region = editor.draw_region;
+                                    editor.update_draw_region(region.0 - 1, region.1 - 1);
+                                    let mut stdout = stdout();
+                                    stdout.queue(cursor::MoveUp(1))?;
+                                    stdout.flush()?;
+                                    pos -= 1;
+                                }
+                                editor.set_draw_line(pos as usize);
+                                editor.update_status();
+                                save_cursor_pos();
+                                editor.redraw()?;
+                                restore_cursor_pos();
+                            }
                         }
                         'l' => {
                             let mut stdout = stdout();
@@ -224,16 +267,12 @@ fn main() -> Result<()> {
                             editor.set_insert_mode();
                         }
                         'a' => match editor.mode {
-                            EditorMode::Insert => {
-                                // let x = cursor::position()?;
-                                // let status = format!("x: {}, y: {}", x.0, x.1);
-                                // editor.update_status(x.1);
-                                // save_cursor_pos();
-                                // editor.redraw()?;
-                                // restore_cursor_pos();
-                            }
+                            EditorMode::Insert => {}
                             _ => {}
                         },
+                        ':' => {
+                            // TODO command entry
+                        }
                         _ => {}
                     },
                     KeyCode::Enter => {}
@@ -260,12 +299,8 @@ fn main() -> Result<()> {
                     _ => {}
                 };
             }
-            Event::Mouse(event) => {
-                //println!("{:?}", event)
-            }
-            Event::Resize(width, height) => {
-                //println!("width: {} and height: {}", width, height)
-            }
+            Event::Mouse(event) => {}
+            Event::Resize(width, height) => {}
         }
     }
 
