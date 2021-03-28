@@ -1,4 +1,8 @@
-use crossterm::{cursor, terminal, QueueableCommand};
+use crossterm::{
+    cursor,
+    terminal::{self, ClearType},
+    QueueableCommand, Result,
+};
 use std::io::{stdout, Write};
 
 pub fn save_cursor_pos() {
@@ -22,4 +26,14 @@ pub fn set_cursor_pos(x: u16, y: u16) {
 pub fn get_term_size() -> (usize, usize) {
     let term_size = terminal::size().unwrap();
     (term_size.0 as usize, term_size.1 as usize)
+}
+
+pub fn init_term() -> Result<()> {
+    let mut stdout = stdout();
+    stdout.queue(terminal::EnterAlternateScreen)?;
+    stdout.queue(terminal::Clear(ClearType::All))?;
+    stdout.flush()?;
+    terminal::enable_raw_mode()?;
+
+    Ok(())
 }

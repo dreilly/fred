@@ -7,7 +7,7 @@ use crossterm::{
 };
 use std::io::{stdout, Write};
 
-use crate::term;
+use crate::{fredFile, term};
 
 pub enum EditorMode {
     Normal,
@@ -34,6 +34,32 @@ pub struct Line {
 }
 
 impl Editor {
+    pub fn new() -> Editor {
+        Editor {
+            lines: Vec::new(),
+            status: "Normal".to_string(),
+            mode: EditorMode::Normal,
+            draw_region: (0, term::get_term_size().1),
+            draw_line: 1,
+            key_state: KeyState::Inactive,
+        }
+    }
+
+    pub fn read_from_file(&mut self, f_name: String) {
+        if let Ok(lines) = fredFile::read_lines(f_name) {
+            for row in lines {
+                let mut line: Line = Line {
+                    line_chars: Vec::new(),
+                };
+                if let Ok(r) = row {
+                    for c in r.chars() {
+                        line.line_chars.push(c);
+                    }
+                }
+                self.lines.push(line);
+            }
+        }
+    }
     pub fn draw_editor(&self, redraw: bool) -> Result<()> {
         let mut stdout = stdout();
         let region = self.draw_region;
