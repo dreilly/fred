@@ -1,5 +1,6 @@
 use crossterm::{
     cursor,
+    event::{read, Event, KeyCode, KeyEvent, KeyModifiers},
     style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
     terminal::{self, ClearType},
     QueueableCommand, Result,
@@ -152,5 +153,123 @@ impl Editor {
         }
 
         pad
+    }
+
+    pub fn handle_input(&mut self) -> Result<()> {
+        loop {
+            match read()? {
+                Event::Key(KeyEvent {
+                    code,
+                    modifiers: KeyModifiers::CONTROL,
+                }) => match code {
+                    KeyCode::Char('q') => {
+                        terminal::Clear(ClearType::All);
+                        break;
+                    }
+                    _ => {}
+                },
+                Event::Key(KeyEvent { code, modifiers: _ }) => {
+                    match code {
+                        KeyCode::Char(c) => match c {
+                            'h' => {
+                                let mut stdout = stdout();
+                                stdout.queue(cursor::MoveLeft(1))?;
+                                stdout.flush()?;
+                            }
+                            'j' => {
+                                if self.draw_region.1 < self.lines.len()
+                                    || self.draw_line < term::get_term_size().1 - 1
+                                {
+                                    let mut pos = cursor::position().unwrap().1 + 1;
+                                    let term_size = term::get_term_size().1 as u16;
+                                    if pos < term_size - 1 {
+                                        let mut stdout = stdout();
+                                        stdout.queue(cursor::MoveDown(1))?;
+                                        stdout.flush()?;
+                                        pos += 1;
+                                    } else {
+                                        let region = self.draw_region;
+                                        self.update_draw_region(region.0 + 1, region.1 + 1);
+                                    }
+                                    self.set_draw_line(pos as usize);
+                                    self.update_status();
+                                    term::save_cursor_pos();
+                                    self.redraw()?;
+                                    term::restore_cursor_pos();
+                                }
+                            }
+                            'k' => {
+                                if self.draw_region.0 > 0 || self.draw_line > 1 {
+                                    let mut pos = cursor::position().unwrap().1 + 1;
+                                    if pos > 1 {
+                                        let mut stdout = stdout();
+                                        stdout.queue(cursor::MoveUp(1))?;
+                                        stdout.flush()?;
+                                        pos -= 1;
+                                    } else {
+                                        let region = self.draw_region;
+                                        self.update_draw_region(region.0 - 1, region.1 - 1);
+                                        let mut stdout = stdout();
+                                        stdout.queue(cursor::MoveUp(1))?;
+                                        stdout.flush()?;
+                                        pos -= 1;
+                                    }
+                                    self.set_draw_line(pos as usize);
+                                    self.update_status();
+                                    term::save_cursor_pos();
+                                    self.redraw()?;
+                                    term::restore_cursor_pos();
+                                }
+                            }
+                            'l' => {
+                                let mut stdout = stdout();
+                                stdout.queue(cursor::MoveRight(1))?;
+                                stdout.flush()?;
+                            }
+                            'i' => {
+                                self.set_insert_mode();
+                            }
+                            'v' => {
+                                self.set_visual_mode();
+                            }
+                            'a' => match self.mode {
+                                EditorMode::Insert => {}
+                                _ => {}
+                            },
+                            ':' => {
+                                // TODO command entry
+                            }
+                            _ => {}
+                        },
+                        KeyCode::Enter => {}
+                        KeyCode::Up => {
+                            let mut stdout = stdout();
+                            stdout.queue(cursor::MoveUp(1))?;
+                            stdout.flush()?;
+                        }
+                        KeyCode::Down => {
+                            let mut stdout = stdout();
+                            stdout.queue(cursor::MoveDown(1))?;
+                            stdout.flush()?;
+                        }
+                        KeyCode::Left => {
+                            let mut stdout = stdout();
+                            stdout.queue(cursor::MoveLeft(1))?;
+                            stdout.flush()?;
+                        }
+                        KeyCode::Right => {
+                            let mut stdout = stdout();
+                            stdout.queue(cursor::MoveRight(1))?;
+                            stdout.flush()?;
+                        }
+                        _ => {}
+                    };
+                }
+                Event::Mouse(_event) => {}
+                Event::Resize(_width, _height) => {}
+            }
+        }
+
+        Ok(())
     }
 }
