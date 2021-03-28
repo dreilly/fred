@@ -1,6 +1,6 @@
 use crossterm::{
     cursor,
-    style::Print,
+    style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
     terminal::{self, ClearType},
     QueueableCommand, Result,
 };
@@ -53,7 +53,12 @@ impl Editor {
         let status_message = self.get_status_message();
         let pos = cursor::position().unwrap();
         term::set_cursor_pos(0, pos.1);
+        //let stats_bar_background = Color::Rgb{ };
+
+        stdout.queue(Print(SetBackgroundColor(Color::DarkMagenta)))?;
+        stdout.queue(Print(SetForegroundColor(Color::Black)))?;
         stdout.queue(Print(&status_message))?;
+        stdout.queue(Print(ResetColor))?;
         stdout.flush()?;
 
         if !redraw {
@@ -95,24 +100,57 @@ impl Editor {
         } else {
             self.draw_region.0
         };
+        let term_size = term::get_term_size();
+        let mut status_text = String::with_capacity(term_size.0);
         let ln = self.draw_line + ln_addend;
         match self.mode {
             EditorMode::Normal => {
-                format!(
-                    "NORMAL | Line: {}/{} | DrawRegion: {:?} | DrawLine: {} | TermSize: {:?}",
+                status_text = format!(
+                    " NORMAL | Line: {}/{} | DrawRegion: {:?} | DrawLine: {} | TermSize: {:?}",
                     ln,
                     self.lines.len(),
                     self.draw_region,
                     self.draw_line,
-                    term::get_term_size(),
+                    term_size,
                 )
             }
             EditorMode::Insert => {
-                format!("INSERT | {}", ln)
+                status_text = format!(
+                    " INSERT | Line: {}/{} | DrawRegion: {:?} | DrawLine: {} | TermSize: {:?}",
+                    ln,
+                    self.lines.len(),
+                    self.draw_region,
+                    self.draw_line,
+                    term_size,
+                )
             }
             EditorMode::Visual => {
-                format!("VISUAL | {}", ln)
+                status_text = format!(
+                    " VISUAL | Line: {}/{} | DrawRegion: {:?} | DrawLine: {} | TermSize: {:?}",
+                    ln,
+                    self.lines.len(),
+                    self.draw_region,
+                    self.draw_line,
+                    term_size,
+                )
             }
         }
+        let pad = self.status_padding(status_text.len(), term_size.0);
+        format!("{}{}", status_text, pad)
+    }
+
+    fn status_padding(&self, status_len: usize, term_width: usize) -> String {
+        let mut pad = String::new();
+        let pad_len = term_width - status_len;
+        if status_len <= 0 {
+            return pad;
+        }
+
+        // TODO - Is there a idomatic way of doing this?
+        for _ in 0..pad_len {
+            pad = format!("{} ", pad);
+        }
+
+        pad
     }
 }
