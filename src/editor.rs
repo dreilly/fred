@@ -14,12 +14,19 @@ pub enum EditorMode {
     Insert,
     Visual,
 }
+
+pub enum KeyState {
+    Waiting(char),
+    Inactive,
+}
+
 pub struct Editor {
     pub lines: Vec<Line>,
     pub status: String,
     pub mode: EditorMode,
     pub draw_region: (usize, usize),
     pub draw_line: usize,
+    pub key_state: KeyState,
 }
 
 pub struct Line {
@@ -54,7 +61,6 @@ impl Editor {
         let status_message = self.get_status_message();
         let pos = cursor::position().unwrap();
         term::set_cursor_pos(0, pos.1);
-        //let stats_bar_background = Color::Rgb{ };
 
         stdout.queue(Print(SetBackgroundColor(Color::DarkMagenta)))?;
         stdout.queue(Print(SetForegroundColor(Color::Black)))?;
@@ -75,34 +81,34 @@ impl Editor {
         self.draw_editor(true)
     }
 
-    pub fn set_insert_mode(&mut self) {
+    fn set_insert_mode(&mut self) {
         self.mode = EditorMode::Insert
     }
 
-    pub fn set_visual_mode(&mut self) {
+    fn set_visual_mode(&mut self) {
         self.mode = EditorMode::Visual
     }
 
-    pub fn set_draw_line(&mut self, dl: usize) {
+    fn set_draw_line(&mut self, dl: usize) {
         self.draw_line = dl;
     }
 
-    pub fn update_status(&mut self) {
+    fn update_status(&mut self) {
         self.status = self.get_status_message();
     }
 
-    pub fn update_draw_region(&mut self, start: usize, end: usize) {
+    fn update_draw_region(&mut self, start: usize, end: usize) {
         self.draw_region = (start, end)
     }
 
-    pub fn get_status_message(&self) -> String {
+    fn get_status_message(&self) -> String {
         let ln_addend = if self.draw_region.0 > 0 {
             self.draw_region.0 + 1
         } else {
             self.draw_region.0
         };
         let term_size = term::get_term_size();
-        let mut status_text = String::with_capacity(term_size.0);
+        let mut status_text = String::new();
         let ln = self.draw_line + ln_addend;
         match self.mode {
             EditorMode::Normal => {
@@ -236,6 +242,11 @@ impl Editor {
                                 EditorMode::Insert => {}
                                 _ => {}
                             },
+                            'g' => {
+                                // TODO update keystate here to await next command
+                                // if valid next key  execute move
+                                // else clear key state and exit
+                            }
                             ':' => {
                                 // TODO command entry
                             }

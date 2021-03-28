@@ -1,0 +1,1 @@
+[ ] Status line - clamp to bottom of screen.  Probably move out of lines vec
