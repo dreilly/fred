@@ -7,19 +7,22 @@ use crossterm::{
 };
 use std::io::{stdout, Write};
 
-use crate::{fredFile, term};
+use crate::{fred_file, term};
 
+#[derive(Debug)]
 pub enum EditorMode {
     Normal,
     Insert,
     Visual,
 }
 
+#[derive(Debug)]
 pub enum KeyState {
     Waiting(char),
     Inactive,
 }
 
+#[derive(Debug)]
 pub struct Editor {
     pub lines: Vec<Line>,
     pub status: String,
@@ -29,6 +32,7 @@ pub struct Editor {
     pub key_state: KeyState,
 }
 
+#[derive(Debug)]
 pub struct Line {
     pub line_chars: Vec<char>,
 }
@@ -46,7 +50,7 @@ impl Editor {
     }
 
     pub fn read_from_file(&mut self, f_name: String) {
-        if let Ok(lines) = fredFile::read_lines(f_name) {
+        if let Ok(lines) = fred_file::read_lines(f_name) {
             for row in lines {
                 let mut line: Line = Line {
                     line_chars: Vec::new(),
@@ -127,6 +131,24 @@ impl Editor {
         self.draw_region = (start, end)
     }
 
+    // TODO only redraw for debug info
+    fn update_key_state(&mut self, ks: KeyState) {
+        term::save_cursor_pos();
+        //panic!("self {:?}", s);
+        self.key_state = ks;
+        self.redraw().unwrap();
+        term::restore_cursor_pos();
+    }
+
+    fn get_key_state_text(&self) -> String {
+        match self.key_state {
+            KeyState::Waiting(c) => {
+                format!("WAITING - {}", c)
+            }
+            _ => "INACTIVE".to_string(),
+        }
+    }
+
     fn get_status_message(&self) -> String {
         let ln_addend = if self.draw_region.0 > 0 {
             self.draw_region.0 + 1
@@ -134,21 +156,23 @@ impl Editor {
             self.draw_region.0
         };
         let term_size = term::get_term_size();
-        let mut status_text = String::new();
+        let mut _status_text = String::new();
         let ln = self.draw_line + ln_addend;
+        let ks = self.get_key_state_text();
         match self.mode {
             EditorMode::Normal => {
-                status_text = format!(
-                    " NORMAL | Line: {}/{} | DrawRegion: {:?} | DrawLine: {} | TermSize: {:?}",
+                _status_text = format!(
+                    " NORMAL | Line: {}/{} | DrawRegion: {:?} | DrawLine: {} | TermSize: {:?} | KeyState: {}",
                     ln,
                     self.lines.len(),
                     self.draw_region,
                     self.draw_line,
                     term_size,
+                    ks,
                 )
             }
             EditorMode::Insert => {
-                status_text = format!(
+                _status_text = format!(
                     " INSERT | Line: {}/{} | DrawRegion: {:?} | DrawLine: {} | TermSize: {:?}",
                     ln,
                     self.lines.len(),
@@ -158,7 +182,7 @@ impl Editor {
                 )
             }
             EditorMode::Visual => {
-                status_text = format!(
+                _status_text = format!(
                     " VISUAL | Line: {}/{} | DrawRegion: {:?} | DrawLine: {} | TermSize: {:?}",
                     ln,
                     self.lines.len(),
@@ -168,8 +192,8 @@ impl Editor {
                 )
             }
         }
-        let pad = self.status_padding(status_text.len(), term_size.0);
-        format!("{}{}", status_text, pad)
+        let pad = self.status_padding(_status_text.len(), term_size.0);
+        format!("{}{}", _status_text, pad)
     }
 
     fn status_padding(&self, status_len: usize, term_width: usize) -> String {
@@ -179,7 +203,7 @@ impl Editor {
             return pad;
         }
 
-        // TODO - Is there a idomatic way of doing this?
+        // TODO - Is there a more idomatic way of doing this?
         for _ in 0..pad_len {
             pad = format!("{} ", pad);
         }
@@ -272,9 +296,21 @@ impl Editor {
                                 // TODO update keystate here to await next command
                                 // if valid next key  execute move
                                 // else clear key state and exit
+                                match self.key_state {
+                                    KeyState::Inactive => {
+                                        self.update_key_state(KeyState::Waiting(c));
+                                    }
+                                    KeyState::Waiting(_) => {
+                                        let x = cursor::position().unwrap().0;
+                                        self.update_draw_region(0, term::get_term_size().1);
+                                        self.redraw()?;
+                                        term::set_cursor_pos(x, 0);
+                                        self.update_key_state(KeyState::Inactive);
+                                    }
+                                }
                             }
                             ':' => {
-                                // TODO command entry
+                                self.update_key_state(KeyState::Waiting(c));
                             }
                             _ => {}
                         },

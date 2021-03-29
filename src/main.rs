@@ -8,7 +8,7 @@ use std::path::Path;
 
 mod editor;
 use editor::Editor;
-mod fredFile;
+mod fred_file;
 mod term;
 
 fn die() -> Result<()> {
