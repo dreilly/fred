@@ -1,8 +1,4 @@
-use crossterm::{
-    terminal::{self, ClearType},
-    QueueableCommand, Result,
-};
-use std::io::{stdout, Write};
+use crossterm::Result;
 use std::panic;
 use std::path::Path;
 
@@ -11,20 +7,10 @@ use editor::Editor;
 mod fred_file;
 mod term;
 
-fn die() -> Result<()> {
-    let mut stdout = stdout();
-    stdout.queue(terminal::Clear(ClearType::All))?;
-    stdout.queue(terminal::LeaveAlternateScreen)?;
-    stdout.flush()?;
-    terminal::disable_raw_mode()?;
-    Ok(())
-}
-
 fn main() -> Result<()> {
     panic::set_hook(Box::new(|i| {
-        die().unwrap();
+        term::die().unwrap();
         println!("Unrecoverable error");
-        // prints panic info
         // TODO - should only happen for debugging
         println!("{:?}", i);
     }));
@@ -45,5 +31,5 @@ fn main() -> Result<()> {
     editor.draw_editor(false)?;
     editor.handle_input()?;
 
-    die()
+    term::die()
 }

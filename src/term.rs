@@ -37,3 +37,12 @@ pub fn init_term() -> Result<()> {
 
     Ok(())
 }
+
+pub fn die() -> Result<()> {
+    let mut stdout = stdout();
+    stdout.queue(terminal::Clear(ClearType::All))?;
+    stdout.queue(terminal::LeaveAlternateScreen)?;
+    stdout.flush()?;
+    terminal::disable_raw_mode()?;
+    Ok(())
+}

@@ -218,10 +218,6 @@ impl Editor {
                     code,
                     modifiers: KeyModifiers::CONTROL,
                 }) => match code {
-                    KeyCode::Char('q') => {
-                        terminal::Clear(ClearType::All);
-                        break;
-                    }
                     _ => {}
                 },
                 Event::Key(KeyEvent { code, modifiers: _ }) => {
@@ -309,9 +305,28 @@ impl Editor {
                                     }
                                 }
                             }
-                            ':' => {
-                                self.update_key_state(KeyState::Waiting(c));
+                            'q' => {
+                                match self.key_state {
+                                    KeyState::Waiting(cmd) => match cmd {
+                                        ':' => {
+                                            //TODO prompt user before exiting
+                                            //TODO expect enter to follow like vim?
+                                            terminal::Clear(ClearType::All);
+                                            break;
+                                        }
+                                        _ => {}
+                                    },
+                                    _ => {}
+                                }
                             }
+                            ':' => match self.key_state {
+                                KeyState::Inactive => {
+                                    self.update_key_state(KeyState::Waiting(c));
+                                }
+                                KeyState::Waiting(_) => {
+                                    self.update_key_state(KeyState::Inactive);
+                                }
+                            },
                             _ => {}
                         },
                         KeyCode::Enter => {}
