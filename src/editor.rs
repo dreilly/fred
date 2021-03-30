@@ -288,22 +288,28 @@ impl Editor {
                                 EditorMode::Insert => {}
                                 _ => {}
                             },
-                            'g' => {
-                                // TODO update keystate here to await next command
-                                // if valid next key  execute move
-                                // else clear key state and exit
-                                match self.key_state {
-                                    KeyState::Inactive => {
-                                        self.update_key_state(KeyState::Waiting(c));
-                                    }
-                                    KeyState::Waiting(_) => {
-                                        let x = cursor::position().unwrap().0;
-                                        self.update_draw_region(0, term::get_term_size().1);
-                                        self.redraw()?;
-                                        term::set_cursor_pos(x, 0);
-                                        self.update_key_state(KeyState::Inactive);
-                                    }
+                            'g' => match self.key_state {
+                                KeyState::Inactive => {
+                                    self.update_key_state(KeyState::Waiting(c));
                                 }
+                                KeyState::Waiting(_) => {
+                                    let x = cursor::position().unwrap().0;
+                                    self.update_draw_region(0, term::get_term_size().1);
+                                    self.redraw()?;
+                                    term::set_cursor_pos(x, 0);
+                                    self.update_key_state(KeyState::Inactive);
+                                }
+                            },
+                            'G' => {
+                                // TODO this will break on files with less lines than the
+                                // terminal size.
+                                let x = cursor::position().unwrap().0;
+                                let ts = term::get_term_size();
+                                let draw_region_start = self.lines.len() - ts.1;
+                                self.update_draw_region(draw_region_start, self.lines.len());
+                                self.redraw()?;
+                                term::set_cursor_pos(x, (ts.1 - 2) as u16);
+                                self.update_key_state(KeyState::Inactive);
                             }
                             'q' => {
                                 match self.key_state {
