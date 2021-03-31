@@ -143,7 +143,6 @@ impl Editor {
         self.draw_region = (start, end)
     }
 
-    // TODO only redraw for debug info
     fn update_key_state(&mut self, ks: KeyState) {
         term::save_cursor_pos();
         self.key_state = ks;
@@ -326,6 +325,7 @@ impl Editor {
                                 KeyState::Waiting(_) => {
                                     let x = cursor::position().unwrap().0;
                                     self.update_draw_region(0, term::get_term_size().1);
+                                    self.set_draw_line(0);
                                     self.redraw()?;
                                     term::set_cursor_pos(x, 0);
                                     self.update_key_state(KeyState::Inactive);
@@ -339,6 +339,7 @@ impl Editor {
                                 let ts = term::get_term_size();
                                 let draw_region_start = self.lines.len() - ts.1;
                                 self.update_draw_region(draw_region_start, self.lines.len());
+                                self.set_draw_line(ts.1 - 1);
                                 self.redraw()?;
                                 term::set_cursor_pos(x, (ts.1 - 2) as u16);
                                 self.update_key_state(KeyState::Inactive);
@@ -369,26 +370,6 @@ impl Editor {
                             _ => {}
                         },
                         KeyCode::Enter => {}
-                        KeyCode::Up => {
-                            let mut stdout = stdout();
-                            stdout.queue(cursor::MoveUp(1))?;
-                            stdout.flush()?;
-                        }
-                        KeyCode::Down => {
-                            let mut stdout = stdout();
-                            stdout.queue(cursor::MoveDown(1))?;
-                            stdout.flush()?;
-                        }
-                        KeyCode::Left => {
-                            let mut stdout = stdout();
-                            stdout.queue(cursor::MoveLeft(1))?;
-                            stdout.flush()?;
-                        }
-                        KeyCode::Right => {
-                            let mut stdout = stdout();
-                            stdout.queue(cursor::MoveRight(1))?;
-                            stdout.flush()?;
-                        }
                         _ => {}
                     };
                 }
