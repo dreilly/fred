@@ -1,4 +1,4 @@
-[#](#) fred
+# fred
 Simple vim clone in Rust.
 
 Basic Usage
