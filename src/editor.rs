@@ -43,6 +43,10 @@ impl Line {
     fn insert_char_at(&mut self, i: usize, c: char) {
         self.line_chars.insert(i, c);
     }
+
+    fn remove_char_at(&mut self, i: usize) {
+        self.line_chars.remove(i - 1);
+    }
 }
 
 impl Editor {
@@ -322,15 +326,27 @@ impl Editor {
         loop {
             match self.mode {
                 EditorMode::Insert => match read()? {
-                    Event::Key(KeyEvent {
-                        code,
-                        modifiers: KeyModifiers::CONTROL,
-                    }) => match code {
-                        _ => {}
-                    },
                     Event::Key(KeyEvent { code, modifiers: _ }) => match code {
                         KeyCode::Esc => {
                             self.set_normal_mode();
+                        }
+                        KeyCode::Tab => {
+                            let pos = cursor::position()?;
+                            let line = self.get_line_from_cursor(pos);
+                            line.insert_char_at(pos.0 as usize, '\t');
+                            term::save_cursor_pos();
+                            self.redraw()?;
+                            term::restore_cursor_pos();
+                            term::set_cursor_pos(pos.0 + 1, pos.1);
+                        }
+                        KeyCode::Backspace => {
+                            let pos = cursor::position()?;
+                            let line = self.get_line_from_cursor(pos);
+                            line.remove_char_at(pos.0 as usize);
+                            term::save_cursor_pos();
+                            self.redraw()?;
+                            term::restore_cursor_pos();
+                            term::set_cursor_pos(pos.0 - 1, pos.1);
                         }
                         KeyCode::Char(c) => match c {
                             _ => {

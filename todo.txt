@@ -1,1 +1,8 @@
-[ ] Status line - clamp to bottom of screen.  Probably move out of lines vec
+[X] Status line - clamp to bottom of screen.  Probably move out of lines vec
+[ ] Bounds check all insertions and deletions [Backspace]
+[ ] Properly move cursor after current insertion [tabs]
+[ ] Write to file
+[ ] swap files?
+[ ] Cleanup character read loop into separate functions or even separate files [Insertion,Normal,Visual]
+[ ] Consider separate files for commonds [g, :]
+[ ] Add support for non-immediately executed commands [:, 5j]
