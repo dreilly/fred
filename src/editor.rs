@@ -28,7 +28,8 @@ pub struct Editor {
     pub lines: Vec<Line>,
     pub status: String,
     pub mode: EditorMode,
-    pub draw_region: (usize, usize),
+    pub v_draw_region: (usize, usize),
+    pub h_draw_region: (usize, usize),
     pub draw_line: usize,
     pub key_state: KeyState,
 }
@@ -44,7 +45,8 @@ impl Editor {
             lines: Vec::new(),
             status: "Normal".to_string(),
             mode: EditorMode::Normal,
-            draw_region: (0, term::get_term_size().1),
+            v_draw_region: (0, term::get_term_size().1),
+            h_draw_region: (0, term::get_term_size().0),
             draw_line: 1,
             key_state: KeyState::Inactive,
         }
@@ -67,7 +69,7 @@ impl Editor {
     }
     pub fn draw_editor(&self, redraw: bool) -> Result<()> {
         let mut stdout = stdout();
-        let region = self.draw_region;
+        let region = self.v_draw_region;
         let mut region_end = region.1;
         if region_end > self.lines.len() {
             region_end = self.lines.len();
@@ -139,8 +141,8 @@ impl Editor {
         self.status = self.get_status_message();
     }
 
-    fn update_draw_region(&mut self, start: usize, end: usize) {
-        self.draw_region = (start, end)
+    fn update_v_draw_region(&mut self, start: usize, end: usize) {
+        self.v_draw_region = (start, end)
     }
 
     fn update_key_state(&mut self, ks: KeyState) {
@@ -160,10 +162,10 @@ impl Editor {
     }
 
     fn get_status_message(&self) -> String {
-        let ln_addend = if self.draw_region.0 > 0 {
-            self.draw_region.0 + 1
+        let ln_addend = if self.v_draw_region.0 > 0 {
+            self.v_draw_region.0 + 1
         } else {
-            self.draw_region.0
+            self.v_draw_region.0
         };
         let term_size = term::get_term_size();
         let mut _status_text = String::new();
@@ -172,10 +174,11 @@ impl Editor {
         match self.mode {
             EditorMode::Normal => {
                 _status_text = format!(
-                    " NORMAL | Line: {}/{} | DrawRegion: {:?} | DrawLine: {} | TermSize: {:?} | KeyState: {}",
+                    " NORMAL | Line: {}/{} | v_draw: {:?} h_draw: {:?} | DrawLine: {} | TermSize: {:?} | KeyState: {}",
                     ln,
                     self.lines.len(),
-                    self.draw_region,
+                    self.v_draw_region,
+                    self.h_draw_region,
                     self.draw_line,
                     term_size,
                     ks,
@@ -183,20 +186,22 @@ impl Editor {
             }
             EditorMode::Insert => {
                 _status_text = format!(
-                    " INSERT | Line: {}/{} | DrawRegion: {:?} | DrawLine: {} | TermSize: {:?}",
+                    " INSERT | Line: {}/{} | v_draw: {:?} h_draw {:?}| DrawLine: {} | TermSize: {:?}",
                     ln,
                     self.lines.len(),
-                    self.draw_region,
+                    self.v_draw_region,
+                    self.h_draw_region,
                     self.draw_line,
                     term_size,
                 )
             }
             EditorMode::Visual => {
                 _status_text = format!(
-                    " VISUAL | Line: {}/{} | DrawRegion: {:?} | DrawLine: {} | TermSize: {:?}",
+                    " VISUAL | Line: {}/{} | v_draw: {:?} h_draw {:?} | DrawLine: {} | TermSize: {:?}",
                     ln,
                     self.lines.len(),
-                    self.draw_region,
+                    self.v_draw_region,
+                    self.h_draw_region,
                     self.draw_line,
                     term_size,
                 )
@@ -222,56 +227,72 @@ impl Editor {
     }
 
     fn move_down(&mut self) {
-        let mut pos = cursor::position().unwrap().1 + 1;
-        let term_size = term::get_term_size().1 as u16;
-        let mut redraw_status_only = true;
-        if pos < term_size - 1 {
-            let mut stdout = stdout();
-            stdout.queue(cursor::MoveDown(1)).unwrap();
-            stdout.flush().unwrap();
-            pos += 1;
-        } else {
-            let region = self.draw_region;
-            self.update_draw_region(region.0 + 1, region.1 + 1);
-            redraw_status_only = false;
+        if self.v_draw_region.1 < self.lines.len() || self.draw_line < term::get_term_size().1 - 1 {
+            let mut pos = cursor::position().unwrap().1 + 1;
+            let term_size = term::get_term_size().1 as u16;
+            let mut redraw_status_only = true;
+            if pos < term_size - 1 {
+                let mut stdout = stdout();
+                stdout.queue(cursor::MoveDown(1)).unwrap();
+                stdout.flush().unwrap();
+                pos += 1;
+            } else {
+                let region = self.v_draw_region;
+                self.update_v_draw_region(region.0 + 1, region.1 + 1);
+                redraw_status_only = false;
+            }
+            self.set_draw_line(pos as usize);
+            self.update_status();
+            term::save_cursor_pos();
+            if redraw_status_only {
+                self.draw_status();
+            } else {
+                self.redraw().unwrap();
+            }
+            term::restore_cursor_pos();
         }
-        self.set_draw_line(pos as usize);
-        self.update_status();
-        term::save_cursor_pos();
-        if redraw_status_only {
-            self.draw_status();
-        } else {
-            self.redraw().unwrap();
-        }
-        term::restore_cursor_pos();
     }
 
     fn move_up(&mut self) {
-        let mut pos = cursor::position().unwrap().1 + 1;
-        let mut redraw_status_only = true;
-        if pos > 1 {
-            let mut stdout = stdout();
-            stdout.queue(cursor::MoveUp(1)).unwrap();
-            stdout.flush().unwrap();
-            pos -= 1;
-        } else {
-            let region = self.draw_region;
-            self.update_draw_region(region.0 - 1, region.1 - 1);
-            let mut stdout = stdout();
-            stdout.queue(cursor::MoveUp(1)).unwrap();
-            stdout.flush().unwrap();
-            pos -= 1;
-            redraw_status_only = false;
+        if self.v_draw_region.0 > 0 || self.draw_line > 1 {
+            let mut pos = cursor::position().unwrap().1 + 1;
+            let mut redraw_status_only = true;
+            if pos > 1 {
+                let mut stdout = stdout();
+                stdout.queue(cursor::MoveUp(1)).unwrap();
+                stdout.flush().unwrap();
+                pos -= 1;
+            } else {
+                let region = self.v_draw_region;
+                self.update_v_draw_region(region.0 - 1, region.1 - 1);
+                let mut stdout = stdout();
+                stdout.queue(cursor::MoveUp(1)).unwrap();
+                stdout.flush().unwrap();
+                pos -= 1;
+                redraw_status_only = false;
+            }
+            self.set_draw_line(pos as usize);
+            self.update_status();
+            term::save_cursor_pos();
+            if redraw_status_only {
+                self.draw_status();
+            } else {
+                self.redraw().unwrap();
+            }
+            term::restore_cursor_pos();
         }
-        self.set_draw_line(pos as usize);
-        self.update_status();
-        term::save_cursor_pos();
-        if redraw_status_only {
-            self.draw_status();
-        } else {
-            self.redraw().unwrap();
-        }
-        term::restore_cursor_pos();
+    }
+
+    fn move_right(&self) {
+        let mut stdout = stdout();
+        stdout.queue(cursor::MoveRight(1)).unwrap();
+        stdout.flush().unwrap();
+    }
+
+    fn move_left(&self) {
+        let mut stdout = stdout();
+        stdout.queue(cursor::MoveLeft(1)).unwrap();
+        stdout.flush().unwrap();
     }
 
     pub fn handle_input(&mut self) -> Result<()> {
@@ -287,26 +308,16 @@ impl Editor {
                     match code {
                         KeyCode::Char(c) => match c {
                             'h' => {
-                                let mut stdout = stdout();
-                                stdout.queue(cursor::MoveLeft(1))?;
-                                stdout.flush()?;
+                                self.move_left();
                             }
                             'j' => {
-                                if self.draw_region.1 < self.lines.len()
-                                    || self.draw_line < term::get_term_size().1 - 1
-                                {
-                                    self.move_down();
-                                }
+                                self.move_down();
                             }
                             'k' => {
-                                if self.draw_region.0 > 0 || self.draw_line > 1 {
-                                    self.move_up();
-                                }
+                                self.move_up();
                             }
                             'l' => {
-                                let mut stdout = stdout();
-                                stdout.queue(cursor::MoveRight(1))?;
-                                stdout.flush()?;
+                                self.move_right();
                             }
                             'i' => {
                                 self.set_insert_mode();
@@ -324,7 +335,7 @@ impl Editor {
                                 }
                                 KeyState::Waiting(_) => {
                                     let x = cursor::position().unwrap().0;
-                                    self.update_draw_region(0, term::get_term_size().1);
+                                    self.update_v_draw_region(0, term::get_term_size().1);
                                     self.set_draw_line(1);
                                     self.redraw()?;
                                     term::set_cursor_pos(x, 0);
@@ -338,7 +349,7 @@ impl Editor {
                                 let x = cursor::position().unwrap().0;
                                 let ts = term::get_term_size();
                                 let draw_region_start = self.lines.len() - ts.1;
-                                self.update_draw_region(draw_region_start, self.lines.len());
+                                self.update_v_draw_region(draw_region_start, self.lines.len());
                                 self.set_draw_line(ts.1 - 1);
                                 self.redraw()?;
                                 term::set_cursor_pos(x, (ts.1 - 2) as u16);
@@ -367,6 +378,10 @@ impl Editor {
                                 }
                                 _ => {}
                             },
+                            '0' => {
+                                let pos = cursor::position()?;
+                                term::set_cursor_pos(0, pos.1);
+                            }
                             _ => {}
                         },
                         KeyCode::Enter => {}
