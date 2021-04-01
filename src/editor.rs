@@ -325,7 +325,7 @@ impl Editor {
                                 KeyState::Waiting(_) => {
                                     let x = cursor::position().unwrap().0;
                                     self.update_draw_region(0, term::get_term_size().1);
-                                    self.set_draw_line(0);
+                                    self.set_draw_line(1);
                                     self.redraw()?;
                                     term::set_cursor_pos(x, 0);
                                     self.update_key_state(KeyState::Inactive);
