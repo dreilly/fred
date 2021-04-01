@@ -38,6 +38,20 @@ pub fn init_term() -> Result<()> {
     Ok(())
 }
 
+#[allow(dead_code)]
+pub fn set_cursor_blink() {
+    let mut stdout = stdout();
+    stdout.queue(cursor::EnableBlinking).unwrap();
+    stdout.flush().unwrap();
+}
+
+#[allow(dead_code)]
+pub fn set_cursor_solid() {
+    let mut stdout = stdout();
+    stdout.queue(cursor::DisableBlinking).unwrap();
+    stdout.flush().unwrap();
+}
+
 pub fn die() -> Result<()> {
     let mut stdout = stdout();
     stdout.queue(terminal::Clear(ClearType::All))?;

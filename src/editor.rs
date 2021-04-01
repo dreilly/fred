@@ -39,6 +39,12 @@ pub struct Line {
     pub line_chars: Vec<char>,
 }
 
+impl Line {
+    fn insert_char_at(&mut self, i: usize, c: char) {
+        self.line_chars.insert(i, c);
+    }
+}
+
 impl Editor {
     pub fn new() -> Editor {
         Editor {
@@ -125,12 +131,25 @@ impl Editor {
         self.draw_editor(true)
     }
 
+    fn set_normal_mode(&mut self) {
+        term::save_cursor_pos();
+        self.mode = EditorMode::Normal;
+        self.draw_status();
+        term::restore_cursor_pos();
+    }
+
     fn set_insert_mode(&mut self) {
-        self.mode = EditorMode::Insert
+        term::save_cursor_pos();
+        self.mode = EditorMode::Insert;
+        self.draw_status();
+        term::restore_cursor_pos();
     }
 
     fn set_visual_mode(&mut self) {
-        self.mode = EditorMode::Visual
+        term::save_cursor_pos();
+        self.mode = EditorMode::Visual;
+        self.draw_status();
+        term::restore_cursor_pos();
     }
 
     fn set_draw_line(&mut self, dl: usize) {
@@ -295,104 +314,140 @@ impl Editor {
         stdout.flush().unwrap();
     }
 
+    pub fn get_line_from_cursor(&mut self, p: (u16, u16)) -> &mut Line {
+        &mut self.lines[p.1 as usize]
+    }
+
     pub fn handle_input(&mut self) -> Result<()> {
         loop {
-            match read()? {
-                Event::Key(KeyEvent {
-                    code,
-                    modifiers: KeyModifiers::CONTROL,
-                }) => match code {
+            match self.mode {
+                EditorMode::Insert => match read()? {
+                    Event::Key(KeyEvent {
+                        code,
+                        modifiers: KeyModifiers::CONTROL,
+                    }) => match code {
+                        _ => {}
+                    },
+                    Event::Key(KeyEvent { code, modifiers: _ }) => match code {
+                        KeyCode::Esc => {
+                            self.set_normal_mode();
+                        }
+                        KeyCode::Char(c) => match c {
+                            _ => {
+                                let pos = cursor::position()?;
+                                let line = self.get_line_from_cursor(pos);
+                                line.insert_char_at(pos.0 as usize, c);
+                                term::save_cursor_pos();
+                                self.redraw()?;
+                                term::restore_cursor_pos();
+                                term::set_cursor_pos(pos.0 + 1, pos.1);
+                            }
+                        },
+                        _ => {}
+                    },
                     _ => {}
                 },
-                Event::Key(KeyEvent { code, modifiers: _ }) => {
-                    match code {
-                        KeyCode::Char(c) => match c {
-                            'h' => {
-                                self.move_left();
-                            }
-                            'j' => {
-                                self.move_down();
-                            }
-                            'k' => {
-                                self.move_up();
-                            }
-                            'l' => {
-                                self.move_right();
-                            }
-                            'i' => {
-                                self.set_insert_mode();
-                            }
-                            'v' => {
-                                self.set_visual_mode();
-                            }
-                            'a' => match self.mode {
-                                EditorMode::Insert => {}
-                                _ => {}
-                            },
-                            'g' => match self.key_state {
-                                KeyState::Inactive => {
-                                    self.update_key_state(KeyState::Waiting(c));
-                                }
-                                KeyState::Waiting(_) => {
-                                    let x = cursor::position().unwrap().0;
-                                    self.update_v_draw_region(0, term::get_term_size().1);
-                                    self.set_draw_line(1);
-                                    self.redraw()?;
-                                    term::set_cursor_pos(x, 0);
-                                    self.update_key_state(KeyState::Inactive);
-                                }
-                                _ => {}
-                            },
-                            'G' => {
-                                // TODO this will break on files with less lines than the
-                                // terminal size.
-                                let x = cursor::position().unwrap().0;
-                                let ts = term::get_term_size();
-                                let draw_region_start = self.lines.len() - ts.1;
-                                self.update_v_draw_region(draw_region_start, self.lines.len());
-                                self.set_draw_line(ts.1 - 1);
-                                self.redraw()?;
-                                term::set_cursor_pos(x, (ts.1 - 2) as u16);
-                                self.update_key_state(KeyState::Inactive);
-                            }
-                            'q' => {
-                                match self.key_state {
-                                    KeyState::Waiting(cmd) => match cmd {
-                                        ':' => {
-                                            //TODO prompt user before exiting
-                                            //TODO expect enter to follow like vim?
-                                            terminal::Clear(ClearType::All);
-                                            break;
+                _ => {
+                    match read()? {
+                        Event::Key(KeyEvent {
+                            code,
+                            modifiers: KeyModifiers::CONTROL,
+                        }) => match code {
+                            _ => {}
+                        },
+                        Event::Key(KeyEvent { code, modifiers: _ }) => {
+                            match code {
+                                KeyCode::Char(c) => match c {
+                                    'h' => {
+                                        self.move_left();
+                                    }
+                                    'j' => {
+                                        self.move_down();
+                                    }
+                                    'k' => {
+                                        self.move_up();
+                                    }
+                                    'l' => {
+                                        self.move_right();
+                                    }
+                                    'i' => {
+                                        self.set_insert_mode();
+                                    }
+                                    'v' => {
+                                        self.set_visual_mode();
+                                    }
+                                    'a' => match self.mode {
+                                        EditorMode::Insert => {}
+                                        _ => {}
+                                    },
+                                    'g' => match self.key_state {
+                                        KeyState::Inactive => {
+                                            self.update_key_state(KeyState::Waiting(c));
+                                        }
+                                        KeyState::Waiting(_) => {
+                                            let x = cursor::position()?.0;
+                                            self.update_v_draw_region(0, term::get_term_size().1);
+                                            self.set_draw_line(1);
+                                            self.redraw()?;
+                                            term::set_cursor_pos(x, 0);
+                                            self.update_key_state(KeyState::Inactive);
                                         }
                                         _ => {}
                                     },
+                                    'G' => {
+                                        // TODO this will break on files with less lines than the
+                                        // terminal size.
+                                        let x = cursor::position().unwrap().0;
+                                        let ts = term::get_term_size();
+                                        let draw_region_start = self.lines.len() - ts.1;
+                                        self.update_v_draw_region(
+                                            draw_region_start,
+                                            self.lines.len(),
+                                        );
+                                        self.set_draw_line(ts.1 - 1);
+                                        self.redraw()?;
+                                        term::set_cursor_pos(x, (ts.1 - 2) as u16);
+                                        self.update_key_state(KeyState::Inactive);
+                                    }
+                                    'q' => {
+                                        match self.key_state {
+                                            KeyState::Waiting(cmd) => match cmd {
+                                                ':' => {
+                                                    //TODO prompt user before exiting
+                                                    //TODO expect enter to follow like vim?
+                                                    terminal::Clear(ClearType::All);
+                                                    break;
+                                                }
+                                                _ => {}
+                                            },
+                                            _ => {}
+                                        }
+                                    }
+                                    ':' => match self.key_state {
+                                        KeyState::Inactive => {
+                                            self.update_key_state(KeyState::Waiting(c));
+                                        }
+                                        KeyState::Waiting(_) => {
+                                            self.update_key_state(KeyState::Inactive);
+                                        }
+                                        _ => {}
+                                    },
+                                    '0' => {
+                                        let pos = cursor::position()?;
+                                        term::set_cursor_pos(0, pos.1);
+                                    }
                                     _ => {}
-                                }
-                            }
-                            ':' => match self.key_state {
-                                KeyState::Inactive => {
-                                    self.update_key_state(KeyState::Waiting(c));
-                                }
-                                KeyState::Waiting(_) => {
-                                    self.update_key_state(KeyState::Inactive);
-                                }
+                                },
+                                KeyCode::Enter => {}
                                 _ => {}
-                            },
-                            '0' => {
-                                let pos = cursor::position()?;
-                                term::set_cursor_pos(0, pos.1);
-                            }
-                            _ => {}
-                        },
-                        KeyCode::Enter => {}
-                        _ => {}
-                    };
+                            };
+                        }
+                        Event::Mouse(_event) => {}
+                        Event::Resize(_width, _height) => {}
+                    }
                 }
-                Event::Mouse(_event) => {}
-                Event::Resize(_width, _height) => {}
             }
         }
-
         Ok(())
     }
 }
