@@ -32,6 +32,7 @@ pub struct Editor {
     pub h_draw_region: (usize, usize),
     pub draw_line: usize,
     pub key_state: KeyState,
+    pub line_num_buf: Vec<char>,
 }
 
 #[derive(Debug)]
@@ -59,7 +60,28 @@ impl Editor {
             h_draw_region: (0, term::get_term_size().0),
             draw_line: 1,
             key_state: KeyState::Inactive,
+            line_num_buf: Vec::new(),
         }
+    }
+
+    fn draw_line_numbers(&self, ln: usize) {
+        let buf_width = self.line_num_buf.len();
+        let ln_as_chars: Vec<char> = ln.to_string().chars().collect();
+        let mut stdout = stdout();
+        for n in 0..buf_width {
+            if n >= ln_as_chars.len() {
+                stdout.queue(Print(' ')).unwrap();
+            } else {
+                stdout.queue(Print(ln_as_chars[n])).unwrap();
+            }
+        }
+        stdout.queue(Print(' ')).unwrap();
+        stdout.flush().unwrap();
+    }
+
+    fn update_line_num_buff(&mut self, n: usize) {
+        let ln_as_string = n.to_string();
+        self.line_num_buf = ln_as_string.chars().collect()
     }
 
     pub fn read_from_file(&mut self, f_name: String) {
@@ -75,8 +97,10 @@ impl Editor {
                 }
                 self.lines.push(line);
             }
+            self.update_line_num_buff(self.lines.len());
         }
     }
+
     pub fn draw_editor(&self, redraw: bool) -> Result<()> {
         let mut stdout = stdout();
         let region = self.v_draw_region;
@@ -86,10 +110,13 @@ impl Editor {
         }
         let iter = self.lines[region.0..region_end].iter().enumerate();
         for (pos, l) in iter {
+            // let ln = iter.position(|x| x.1 == l);
             if pos >= region.1 - 1 {
                 break;
             };
             stdout.queue(cursor::MoveToColumn(0))?;
+            let ln = (region.0) + 1 + pos;
+            self.draw_line_numbers(ln);
             for lc in &l.line_chars {
                 stdout.queue(Print(lc))?;
             }
@@ -326,16 +353,29 @@ impl Editor {
     }
 
     fn move_left(&self) {
-        let mut stdout = stdout();
-        stdout.queue(cursor::MoveLeft(1)).unwrap();
-        stdout.flush().unwrap();
+        let pos = cursor::position().unwrap().0 as usize;
+        let start_pos = self.line_num_buf.len() + 1;
+        if pos > start_pos {
+            let mut stdout = stdout();
+            stdout.queue(cursor::MoveLeft(1)).unwrap();
+            stdout.flush().unwrap();
+        }
+    }
+
+    fn clamp_to_start_of_line(&mut self) {
+        let new_pos = cursor::position().unwrap();
+        let start_pos = self.line_num_buf.len() + 2;
+        if new_pos.0 as usize <= start_pos {
+            term::move_to_column(start_pos as u16);
+        }
     }
 
     fn clamp_to_end_of_line(&mut self) {
         let new_pos = cursor::position().unwrap();
         let line_len = self.get_line_from_cursor().line_chars.len();
+        let line_len_offset = line_len + self.line_num_buf.len() + 1;
         if new_pos.0 as usize > line_len {
-            term::move_to_column(line_len as u16);
+            term::move_to_column(line_len_offset as u16);
         }
     }
 

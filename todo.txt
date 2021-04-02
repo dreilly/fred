@@ -1,9 +1,10 @@
 [X] Status line - clamp to bottom of screen.  Probably move out of lines vec
-[ ] Look into using Crossterm's Scrollup and Scrolldown commands instead of controlling the draw_region manually
-[ ] Bounds check all insertions and deletions [Backspace]
-[ ] Properly move cursor after current insertion [tabs]
+[X] Bounds check all insertions and deletions [Backspace]
+[X] Properly move cursor after current insertion [tabs]
+[ ] Add config file support
+[ ] Display Line Numbers
+[ ] Add support for non-immediately executed commands [:, 5j]
 [ ] Write to file
 [ ] swap files?
 [ ] Cleanup character read loop into separate functions or even separate files [Insertion,Normal,Visual]
 [ ] Consider separate files for commonds [g, :]
-[ ] Add support for non-immediately executed commands [:, 5j]
