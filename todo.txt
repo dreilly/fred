@@ -1,4 +1,5 @@
 [X] Status line - clamp to bottom of screen.  Probably move out of lines vec
+[ ] Look into using Crossterm's Scrollup and Scrolldown commands instead of controlling the draw_region manually
 [ ] Bounds check all insertions and deletions [Backspace]
 [ ] Properly move cursor after current insertion [tabs]
 [ ] Write to file

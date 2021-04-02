@@ -60,3 +60,9 @@ pub fn die() -> Result<()> {
     terminal::disable_raw_mode()?;
     Ok(())
 }
+
+pub fn move_to_column(col: u16) {
+    let mut stdout = stdout();
+    stdout.queue(cursor::MoveToColumn(col)).unwrap();
+    stdout.flush().unwrap();
+}

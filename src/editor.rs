@@ -40,7 +40,7 @@ pub struct Line {
 }
 
 impl Line {
-    fn insert_char_at(&mut self, i: usize, c: char) {
+    fn insert_char_at_cursor(&mut self, i: usize, c: char) {
         self.line_chars.insert(i, c);
     }
 
@@ -91,11 +91,7 @@ impl Editor {
             };
             stdout.queue(cursor::MoveToColumn(0))?;
             for lc in &l.line_chars {
-                match lc {
-                    _ => {
-                        stdout.queue(Print(lc))?;
-                    }
-                }
+                stdout.queue(Print(lc))?;
             }
             stdout.queue(Print('\n'))?;
             stdout.flush()?;
@@ -273,6 +269,8 @@ impl Editor {
                 self.redraw().unwrap();
             }
             term::restore_cursor_pos();
+
+            self.clamp_to_end_of_line();
         }
     }
 
@@ -303,13 +301,28 @@ impl Editor {
                 self.redraw().unwrap();
             }
             term::restore_cursor_pos();
+
+            self.clamp_to_end_of_line();
         }
     }
 
-    fn move_right(&self) {
-        let mut stdout = stdout();
-        stdout.queue(cursor::MoveRight(1)).unwrap();
-        stdout.flush().unwrap();
+    fn move_right(&mut self) {
+        let pos = cursor::position().unwrap();
+        let line = &self.get_line_from_cursor().line_chars;
+        let line_len = line.len();
+        if line_len > 0 {
+            let stop_point = if line_len >= 2 {
+                // this is len() - 2 because it assumes the last char in the vec is a new line character
+                line_len - 2
+            } else {
+                line_len - 1
+            };
+            if pos.0 as usize <= stop_point {
+                let mut stdout = stdout();
+                stdout.queue(cursor::MoveRight(1)).unwrap();
+                stdout.flush().unwrap();
+            }
+        }
     }
 
     fn move_left(&self) {
@@ -318,8 +331,22 @@ impl Editor {
         stdout.flush().unwrap();
     }
 
-    pub fn get_line_from_cursor(&mut self, p: (u16, u16)) -> &mut Line {
-        &mut self.lines[p.1 as usize]
+    fn clamp_to_end_of_line(&mut self) {
+        let new_pos = cursor::position().unwrap();
+        let line_len = self.get_line_from_cursor().line_chars.len();
+        if new_pos.0 as usize > line_len {
+            term::move_to_column(line_len as u16);
+        }
+    }
+
+    pub fn get_line_from_cursor(&mut self) -> &mut Line {
+        let addend = if self.v_draw_region.0 == 0 {
+            self.draw_line - 1
+        } else {
+            self.draw_line
+        };
+        let point = addend + self.v_draw_region.0;
+        &mut self.lines[point]
     }
 
     pub fn handle_input(&mut self) -> Result<()> {
@@ -332,8 +359,8 @@ impl Editor {
                         }
                         KeyCode::Tab => {
                             let pos = cursor::position()?;
-                            let line = self.get_line_from_cursor(pos);
-                            line.insert_char_at(pos.0 as usize, '\t');
+                            let line = self.get_line_from_cursor();
+                            line.insert_char_at_cursor(pos.0 as usize, '\t');
                             term::save_cursor_pos();
                             self.redraw()?;
                             term::restore_cursor_pos();
@@ -341,18 +368,20 @@ impl Editor {
                         }
                         KeyCode::Backspace => {
                             let pos = cursor::position()?;
-                            let line = self.get_line_from_cursor(pos);
-                            line.remove_char_at(pos.0 as usize);
-                            term::save_cursor_pos();
-                            self.redraw()?;
-                            term::restore_cursor_pos();
-                            term::set_cursor_pos(pos.0 - 1, pos.1);
+                            if pos.0 > 0 {
+                                let line = self.get_line_from_cursor();
+                                line.remove_char_at(pos.0 as usize);
+                                term::save_cursor_pos();
+                                self.redraw()?;
+                                term::restore_cursor_pos();
+                                self.move_left();
+                            }
                         }
                         KeyCode::Char(c) => match c {
                             _ => {
                                 let pos = cursor::position()?;
-                                let line = self.get_line_from_cursor(pos);
-                                line.insert_char_at(pos.0 as usize, c);
+                                let line = self.get_line_from_cursor();
+                                line.insert_char_at_cursor(pos.0 as usize, c);
                                 term::save_cursor_pos();
                                 self.redraw()?;
                                 term::restore_cursor_pos();
@@ -449,8 +478,9 @@ impl Editor {
                                         _ => {}
                                     },
                                     '0' => {
-                                        let pos = cursor::position()?;
-                                        term::set_cursor_pos(0, pos.1);
+                                        // let pos = cursor::position()?;
+                                        // term::set_cursor_pos(0, pos.1);
+                                        term::move_to_column(0);
                                     }
                                     _ => {}
                                 },
