@@ -361,7 +361,7 @@ impl Editor {
         }
     }
 
-    fn clamp_to_start_of_line(&mut self) {
+    fn _clamp_to_start_of_line(&mut self) {
         let new_pos = cursor::position().unwrap();
         let start_pos = self.line_num_buf.len() + 2;
         if new_pos.0 as usize <= start_pos {
@@ -392,10 +392,6 @@ impl Editor {
         &mut self.lines[point]
     }
 
-    fn get_line_num_buff_size(&self) -> usize {
-        self.line_num_buf.len()
-    }
-
     fn ln_pad(&self) -> usize {
         self.lines.len().to_string().len() + 1
     }
@@ -419,8 +415,8 @@ impl Editor {
                         }
                         KeyCode::Backspace => {
                             let pos = cursor::position()?;
-                            if pos.0 > 0 {
-                                let pad = self.ln_pad() + 1;
+                            let pad = self.ln_pad() + 1;
+                            if pos.0 as usize - pad > 0 {
                                 let line = self.get_line_from_cursor();
                                 line.remove_char_at(pos.0 as usize - pad);
                                 term::save_cursor_pos();
@@ -513,7 +509,6 @@ impl Editor {
                                                 ':' => {
                                                     //TODO prompt user before exiting
                                                     //TODO expect enter to follow like vim?
-                                                    terminal::Clear(ClearType::All);
                                                     break;
                                                 }
                                                 _ => {}

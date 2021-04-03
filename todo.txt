@@ -1,10 +1,9 @@
 [X] Status line - clamp to bottom of screen.  Probably move out of lines vec
 [X] Bounds check all insertions and deletions [Backspace]
 [X] Properly move cursor after current insertion [tabs]
+[X] Display Line Numbers
 [ ] Add config file support
-[ ] Display Line Numbers
 [ ] Add support for non-immediately executed commands [:, 5j]
-[ ] Write to file
-[ ] swap files?
+[ ] Write to file (swap files)?
 [ ] Cleanup character read loop into separate functions or even separate files [Insertion,Normal,Visual]
 [ ] Consider separate files for commonds [g, :]
