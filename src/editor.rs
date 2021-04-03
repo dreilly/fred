@@ -65,16 +65,13 @@ impl Editor {
     }
 
     fn draw_line_numbers(&self, ln: usize) {
-        let buf_width = self.line_num_buf.len();
-        let ln_as_chars: Vec<char> = ln.to_string().chars().collect();
         let mut stdout = stdout();
-        for n in 0..buf_width {
-            if n >= ln_as_chars.len() {
-                stdout.queue(Print(' ')).unwrap();
-            } else {
-                stdout.queue(Print(ln_as_chars[n])).unwrap();
-            }
+        let pad = self.ln_pad() - ln.to_string().len();
+        for _ in 0..pad {
+            stdout.queue(Print(' ')).unwrap();
         }
+        stdout.queue(Print(ln)).unwrap();
+
         stdout.queue(Print(' ')).unwrap();
         stdout.flush().unwrap();
     }
@@ -126,7 +123,8 @@ impl Editor {
 
         self.draw_status();
         if !redraw {
-            term::set_cursor_pos(0, 0);
+            let pad = self.ln_pad();
+            term::set_cursor_pos(pad as u16, 0);
         }
         Ok(())
     }
@@ -344,7 +342,8 @@ impl Editor {
             } else {
                 line_len - 1
             };
-            if pos.0 as usize <= stop_point {
+            let pad = self.ln_pad() + 1;
+            if pos.0 as usize <= (stop_point + pad) {
                 let mut stdout = stdout();
                 stdout.queue(cursor::MoveRight(1)).unwrap();
                 stdout.flush().unwrap();
@@ -373,7 +372,11 @@ impl Editor {
     fn clamp_to_end_of_line(&mut self) {
         let new_pos = cursor::position().unwrap();
         let line_len = self.get_line_from_cursor().line_chars.len();
-        let line_len_offset = line_len + self.line_num_buf.len() + 1;
+        let line_len_offset = if line_len == 0 {
+            line_len + self.line_num_buf.len() + 2
+        } else {
+            line_len + self.line_num_buf.len() + 1
+        };
         if new_pos.0 as usize > line_len {
             term::move_to_column(line_len_offset as u16);
         }
@@ -387,6 +390,14 @@ impl Editor {
         };
         let point = addend + self.v_draw_region.0;
         &mut self.lines[point]
+    }
+
+    fn get_line_num_buff_size(&self) -> usize {
+        self.line_num_buf.len()
+    }
+
+    fn ln_pad(&self) -> usize {
+        self.lines.len().to_string().len() + 1
     }
 
     pub fn handle_input(&mut self) -> Result<()> {
@@ -409,8 +420,9 @@ impl Editor {
                         KeyCode::Backspace => {
                             let pos = cursor::position()?;
                             if pos.0 > 0 {
+                                let pad = self.ln_pad() + 1;
                                 let line = self.get_line_from_cursor();
-                                line.remove_char_at(pos.0 as usize);
+                                line.remove_char_at(pos.0 as usize - pad);
                                 term::save_cursor_pos();
                                 self.redraw()?;
                                 term::restore_cursor_pos();
@@ -420,8 +432,9 @@ impl Editor {
                         KeyCode::Char(c) => match c {
                             _ => {
                                 let pos = cursor::position()?;
+                                let pad = self.ln_pad();
                                 let line = self.get_line_from_cursor();
-                                line.insert_char_at_cursor(pos.0 as usize, c);
+                                line.insert_char_at_cursor(pos.0 as usize - pad, c);
                                 term::save_cursor_pos();
                                 self.redraw()?;
                                 term::restore_cursor_pos();
