@@ -123,7 +123,7 @@ impl Editor {
 
         self.draw_status();
         if !redraw {
-            let pad = self.ln_pad();
+            let pad = self.ln_pad() + 1;
             term::set_cursor_pos(pad as u16, 0);
         }
         Ok(())
@@ -353,7 +353,8 @@ impl Editor {
 
     fn move_left(&self) {
         let pos = cursor::position().unwrap().0 as usize;
-        let start_pos = self.line_num_buf.len() + 1;
+        let start_pos = self.ln_pad() + 1;
+
         if pos > start_pos {
             let mut stdout = stdout();
             stdout.queue(cursor::MoveLeft(1)).unwrap();
@@ -372,13 +373,9 @@ impl Editor {
     fn clamp_to_end_of_line(&mut self) {
         let new_pos = cursor::position().unwrap();
         let line_len = self.get_line_from_cursor().line_chars.len();
-        let line_len_offset = if line_len == 0 {
-            line_len + self.line_num_buf.len() + 2
-        } else {
-            line_len + self.line_num_buf.len() + 1
-        };
+        let line_len_offset = self.ln_pad() + 1;
         if new_pos.0 as usize > line_len {
-            term::move_to_column(line_len_offset as u16);
+            term::move_to_column(line_len_offset as u16 + 1);
         }
     }
 
@@ -406,8 +403,9 @@ impl Editor {
                         }
                         KeyCode::Tab => {
                             let pos = cursor::position()?;
+                            let pad = self.ln_pad() + 1;
                             let line = self.get_line_from_cursor();
-                            line.insert_char_at_cursor(pos.0 as usize, '\t');
+                            line.insert_char_at_cursor(pos.0 as usize - pad, '\t');
                             term::save_cursor_pos();
                             self.redraw()?;
                             term::restore_cursor_pos();
@@ -428,7 +426,7 @@ impl Editor {
                         KeyCode::Char(c) => match c {
                             _ => {
                                 let pos = cursor::position()?;
-                                let pad = self.ln_pad();
+                                let pad = self.ln_pad() + 1;
                                 let line = self.get_line_from_cursor();
                                 line.insert_char_at_cursor(pos.0 as usize - pad, c);
                                 term::save_cursor_pos();
