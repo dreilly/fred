@@ -9,6 +9,8 @@ use std::io::{stdout, Write};
 
 use crate::{fred_file, term};
 
+const TABASSPACES: u16 = 4;
+
 #[derive(Debug)]
 pub enum EditorMode {
     Normal,
@@ -43,6 +45,12 @@ pub struct Line {
 impl Line {
     fn insert_char_at_cursor(&mut self, i: usize, c: char) {
         self.line_chars.insert(i, c);
+    }
+
+    fn insert_tab_at_cursor(&mut self, i: usize) {
+        for n in 0..TABASSPACES {
+            self.line_chars.insert(i + n as usize, ' ');
+        }
     }
 
     fn remove_char_at(&mut self, i: usize) {
@@ -405,11 +413,11 @@ impl Editor {
                             let pos = cursor::position()?;
                             let pad = self.ln_pad() + 1;
                             let line = self.get_line_from_cursor();
-                            line.insert_char_at_cursor(pos.0 as usize - pad, '\t');
+                            line.insert_tab_at_cursor(pos.0 as usize - pad);
                             term::save_cursor_pos();
                             self.redraw()?;
                             term::restore_cursor_pos();
-                            term::set_cursor_pos(pos.0 + 1, pos.1);
+                            term::set_cursor_pos(pos.0 + TABASSPACES, pos.1);
                         }
                         KeyCode::Backspace => {
                             let pos = cursor::position()?;
