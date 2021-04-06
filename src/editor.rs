@@ -370,12 +370,9 @@ impl Editor {
         }
     }
 
-    fn _clamp_to_start_of_line(&mut self) {
-        let new_pos = cursor::position().unwrap();
-        let start_pos = self.line_num_buf.len() + 2;
-        if new_pos.0 as usize <= start_pos {
-            term::move_to_column(start_pos as u16);
-        }
+    fn clamp_to_start_of_line(&mut self) {
+        let start_pos = self.ln_pad() + 2;
+        term::move_to_column(start_pos as u16);
     }
 
     fn clamp_to_end_of_line(&mut self) {
@@ -531,11 +528,7 @@ impl Editor {
                                         }
                                         _ => {}
                                     },
-                                    '0' => {
-                                        // let pos = cursor::position()?;
-                                        // term::set_cursor_pos(0, pos.1);
-                                        term::move_to_column(0);
-                                    }
+                                    '0' => self.clamp_to_start_of_line(),
                                     _ => {}
                                 },
                                 KeyCode::Enter => {}
