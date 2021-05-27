@@ -1,4 +1,6 @@
+use confy;
 use crossterm::Result;
+use serde::{Deserialize, Serialize};
 use std::panic;
 use std::path::Path;
 
@@ -7,6 +9,17 @@ use editor::Editor;
 mod fred_file;
 mod term;
 
+#[derive(Debug, Serialize, Deserialize)]
+struct FredConfig {
+    tab_spaces: u16,
+}
+
+impl ::std::default::Default for FredConfig {
+    fn default() -> Self {
+        Self { tab_spaces: 4 }
+    }
+}
+
 fn main() -> Result<()> {
     panic::set_hook(Box::new(|i| {
         term::die().unwrap();
@@ -14,6 +27,8 @@ fn main() -> Result<()> {
         // TODO - should only happen for debugging
         println!("{:?}", i);
     }));
+    let cfg: FredConfig = confy::load("fred").unwrap();
+    dbg!(cfg);
     term::init_term()?;
     let mut editor = Editor::new();
     let args: Vec<String> = std::env::args().collect();

@@ -5,11 +5,23 @@ use crossterm::{
     terminal::{self, ClearType},
     QueueableCommand, Result,
 };
+use serde::{Deserialize, Serialize};
 use std::io::{stdout, Write};
 
 use crate::{fred_file, term};
 
 const TABASSPACES: u16 = 4;
+
+#[derive(Serialize, Deserialize)]
+struct MyConfig {
+    tab_spaces: u16,
+}
+
+impl ::std::default::Default for MyConfig {
+    fn default() -> Self {
+        Self { tab_spaces: 4 }
+    }
+}
 
 #[derive(Debug)]
 pub enum EditorMode {
