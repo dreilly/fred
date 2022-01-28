@@ -12,7 +12,7 @@ use crate::{fred_file, term};
 
 const TABASSPACES: u16 = 4;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct MyConfig {
     tab_spaces: u16,
 }
