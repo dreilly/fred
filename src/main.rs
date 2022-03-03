@@ -24,8 +24,7 @@ fn main() -> Result<()> {
     panic::set_hook(Box::new(|i| {
         term::die().unwrap();
         println!("Unrecoverable error");
-        // TODO - should only happen for debugging
-        println!("{:?}", i);
+        dbg!("{:?}", i);
     }));
     let cfg: FredConfig = confy::load("fred").unwrap();
     dbg!(cfg);

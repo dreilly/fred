@@ -225,6 +225,7 @@ impl Editor {
         }
     }
 
+    #[allow(unused_assignments)]
     fn get_status_message(&self) -> String {
         let ln_addend = if self.v_draw_region.0 > 0 {
             self.v_draw_region.0 + 1
@@ -232,12 +233,12 @@ impl Editor {
             self.v_draw_region.0
         };
         let term_size = term::get_term_size();
-        let mut _status_text = String::new();
+        let mut status_text = String::new();
         let ln = self.draw_line + ln_addend;
         let ks = self.get_key_state_text();
         match self.mode {
             EditorMode::Normal => {
-                _status_text = format!(
+                status_text = format!(
                     " NORMAL | Line: {}/{} | v_draw: {:?} h_draw: {:?} | DrawLine: {} | TermSize: {:?} | KeyState: {}",
                     ln,
                     self.lines.len(),
@@ -249,7 +250,7 @@ impl Editor {
                 )
             }
             EditorMode::Insert => {
-                _status_text = format!(
+                status_text = format!(
                     " INSERT | Line: {}/{} | v_draw: {:?} h_draw {:?}| DrawLine: {} | TermSize: {:?}",
                     ln,
                     self.lines.len(),
@@ -260,7 +261,7 @@ impl Editor {
                 )
             }
             EditorMode::Visual => {
-                _status_text = format!(
+                status_text = format!(
                     " VISUAL | Line: {}/{} | v_draw: {:?} h_draw {:?} | DrawLine: {} | TermSize: {:?}",
                     ln,
                     self.lines.len(),
@@ -271,23 +272,20 @@ impl Editor {
                 )
             }
         }
-        let pad = self.status_padding(_status_text.len(), term_size.0);
-        format!("{}{}", _status_text, pad)
+        if status_text.len() > term_size.0 {
+            let st = &status_text[..term_size.0];
+            return String::from(st);
+        }
+        let pad = self.status_padding(status_text.len(), term_size.0);
+        format!("{}{}", status_text, pad)
     }
 
     fn status_padding(&self, status_len: usize, term_width: usize) -> String {
-        let mut pad = String::new();
-        let pad_len = term_width - status_len;
-        if status_len <= 0 {
-            return pad;
+        if status_len == 0 || status_len > term_width {
+            return "".into();
         }
 
-        // TODO - Is there a more idomatic way of doing this?
-        for _ in 0..pad_len {
-            pad = format!("{} ", pad);
-        }
-
-        pad
+        " ".repeat(term_width - status_len)
     }
 
     fn move_down(&mut self) {
@@ -413,35 +411,35 @@ impl Editor {
     pub fn handle_input(&mut self) -> Result<()> {
         loop {
             match self.mode {
-                EditorMode::Insert => match read()? {
-                    Event::Key(KeyEvent { code, modifiers: _ }) => match code {
-                        KeyCode::Esc => {
-                            self.set_normal_mode();
-                        }
-                        KeyCode::Tab => {
-                            let pos = cursor::position()?;
-                            let pad = self.ln_pad() + 1;
-                            let line = self.get_line_from_cursor();
-                            line.insert_tab_at_cursor(pos.0 as usize - pad);
-                            term::save_cursor_pos();
-                            self.redraw()?;
-                            term::restore_cursor_pos();
-                            term::set_cursor_pos(pos.0 + TABASSPACES, pos.1);
-                        }
-                        KeyCode::Backspace => {
-                            let pos = cursor::position()?;
-                            let pad = self.ln_pad() + 1;
-                            if pos.0 as usize - pad > 0 {
+                EditorMode::Insert => {
+                    if let Event::Key(KeyEvent { code, modifiers: _ }) = read()? {
+                        match code {
+                            KeyCode::Esc => {
+                                self.set_normal_mode();
+                            }
+                            KeyCode::Tab => {
+                                let pos = cursor::position()?;
+                                let pad = self.ln_pad() + 1;
                                 let line = self.get_line_from_cursor();
-                                line.remove_char_at(pos.0 as usize - pad);
+                                line.insert_tab_at_cursor(pos.0 as usize - pad);
                                 term::save_cursor_pos();
                                 self.redraw()?;
                                 term::restore_cursor_pos();
-                                self.move_left();
+                                term::set_cursor_pos(pos.0 + TABASSPACES, pos.1);
                             }
-                        }
-                        KeyCode::Char(c) => match c {
-                            _ => {
+                            KeyCode::Backspace => {
+                                let pos = cursor::position()?;
+                                let pad = self.ln_pad() + 1;
+                                if pos.0 as usize - pad > 0 {
+                                    let line = self.get_line_from_cursor();
+                                    line.remove_char_at(pos.0 as usize - pad);
+                                    term::save_cursor_pos();
+                                    self.redraw()?;
+                                    term::restore_cursor_pos();
+                                    self.move_left();
+                                }
+                            }
+                            KeyCode::Char(c) => {
                                 let pos = cursor::position()?;
                                 let pad = self.ln_pad() + 1;
                                 let line = self.get_line_from_cursor();
@@ -451,19 +449,16 @@ impl Editor {
                                 term::restore_cursor_pos();
                                 term::set_cursor_pos(pos.0 + 1, pos.1);
                             }
-                        },
-                        _ => {}
-                    },
-                    _ => {}
-                },
+                            _ => {}
+                        }
+                    }
+                }
                 _ => {
                     match read()? {
                         Event::Key(KeyEvent {
-                            code,
+                            code: _,
                             modifiers: KeyModifiers::CONTROL,
-                        }) => match code {
-                            _ => {}
-                        },
+                        }) => {}
                         Event::Key(KeyEvent { code, modifiers: _ }) => {
                             match code {
                                 KeyCode::Char(c) => match c {
@@ -485,10 +480,7 @@ impl Editor {
                                     'v' => {
                                         self.set_visual_mode();
                                     }
-                                    'a' => match self.mode {
-                                        EditorMode::Insert => {}
-                                        _ => {}
-                                    },
+                                    'a' => if let EditorMode::Insert = self.mode {},
                                     'g' => match self.key_state {
                                         KeyState::Inactive => {
                                             self.update_key_state(KeyState::Waiting(c));
@@ -519,16 +511,12 @@ impl Editor {
                                         self.update_key_state(KeyState::Inactive);
                                     }
                                     'q' => {
-                                        match self.key_state {
-                                            KeyState::Waiting(cmd) => match cmd {
-                                                ':' => {
-                                                    //TODO prompt user before exiting
-                                                    //TODO expect enter to follow like vim?
-                                                    break;
-                                                }
-                                                _ => {}
-                                            },
-                                            _ => {}
+                                        if let KeyState::Waiting(cmd) = self.key_state {
+                                            if cmd == ':' {
+                                                //TODO prompt user before exiting
+                                                //TODO expect enter to follow like vim?
+                                                break;
+                                            }
                                         }
                                     }
                                     ':' => match self.key_state {
